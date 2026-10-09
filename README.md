@@ -1,6 +1,6 @@
 # Delta-Pharmacy-API-Testing
 
-A complete QA engagement on the Delta Pharmacy full-stack application (React + Spring Boot), covering the full quality assurance lifecycle: requirements analysis, test design, live execution, and API test automation.
+A complete QC engagement on the Delta Pharmacy full-stack website (React + Spring Boot), covering the full quality control lifecycle: requirements analysis, test design, execution, and API test automation.
 
 What this project includes:
 
