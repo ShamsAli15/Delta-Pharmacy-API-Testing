@@ -1,0 +1,4940 @@
+{
+  "info": {
+    "name": "Delta Pharmacy API - QA Regression + Security Probes",
+    "description": "Runnable Postman collection generated from source-code analysis of the Delta Pharmacy fullstack project. Run the 'Setup' folder first (top to bottom), then the rest in order. Each 'ALL Bad Scenarios' request fires several sub-requests via pm.sendRequest and asserts on each independently - open the Test Results panel after running it to see every sub-test. Requests prefixed [SECURITY]/[CRITICAL SECURITY]/[IDOR FINDING CHECK] assert the SAFE/expected outcome; a failing test on one of these means the corresponding vulnerability is confirmed exploitable against your running backend - treat a failure there as a P1 bug, not a broken test.\n\nBefore running: import the accompanying environment file and set 'baseUrl' if your backend runs on a different host/port than http://localhost:8545/pharmacy-api/api (see application.properties).",
+    "schema": "https://schema.postman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Setup (run first)",
+      "item": [
+        {
+          "name": "Login as Admin (seed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@pharmacy.com\",\n  \"password\": \"admin123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Token present', () => pm.expect(json.data.token).to.be.a('string'));",
+                  "pm.environment.set('adminToken', json.data.token);",
+                  "pm.environment.set('adminId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Pharmacist (seed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"pharmacist@pharmacy.com\",\n  \"password\": \"pharma123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('pharmacistToken', json.data.token);",
+                  "pm.environment.set('pharmacistId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Customer A (seed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"customer123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('customerToken', json.data.token);",
+                  "pm.environment.set('customerId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Customer B (fresh, dynamic)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customerB.{{$timestamp}}@example.com\",\n  \"password\": \"Secure123\",\n  \"fullName\": \"Customer B\",\n  \"phone\": \"1234567890\",\n  \"address\": \"Addr B\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('customerBToken', json.data.token);",
+                  "pm.environment.set('customerBId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Auth - Registration",
+      "item": [
+        {
+          "name": "Register - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser.{{$timestamp}}@example.com\",\n  \"password\": \"Secure123\",\n  \"fullName\": \"New User\",\n  \"phone\": \"1234567890\",\n  \"address\": \"123 Main St\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Role defaults to CUSTOMER', () => pm.expect(json.data.role).to.eql('CUSTOMER'));",
+                  "pm.test('No password field leaked in response', () => pm.expect(json.data.password).to.be.undefined);",
+                  "pm.environment.set('lastRegisteredEmail', pm.request.body ? JSON.parse(pm.request.body.raw).email : '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"placeholder@example.com\",\n  \"password\": \"Secure123\",\n  \"fullName\": \"X\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const scenarios = [",
+                  "  { name: 'Missing email', body: { password: 'Secure123', fullName: 'X' }, expected: 400 },",
+                  "  { name: 'Empty email', body: { email: '', password: 'Secure123', fullName: 'X' }, expected: 400 },",
+                  "  { name: 'Invalid email format', body: { email: 'not-an-email', password: 'Secure123', fullName: 'X' }, expected: 400 },",
+                  "  { name: 'Password below minimum (5 chars)', body: { email: 'p'+Date.now()+'@x.com', password: 'abcde', fullName: 'X' }, expected: 400 },",
+                  "  { name: 'Missing password', body: { email: 'q'+Date.now()+'@x.com', fullName: 'X' }, expected: 400 },",
+                  "  { name: 'Missing fullName', body: { email: 'r'+Date.now()+'@x.com', password: 'Secure123' }, expected: 400 },",
+                  "  { name: 'Whitespace-only fullName', body: { email: 's'+Date.now()+'@x.com', password: 'Secure123', fullName: '   ' }, expected: 400 },",
+                  "  { name: '[VERIFY] Duplicate email (seeded customer)', body: { email: 'customer@example.com', password: 'Secure123', fullName: 'Dup' }, expected: 400 },",
+                  "];",
+                  "",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/auth/register',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Register bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[CRITICAL SECURITY] Self-register with role=ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"selfadmin.{{$timestamp}}@example.com\",\n  \"password\": \"Secure123\",\n  \"fullName\": \"Self Admin Probe\",\n  \"role\": \"ADMIN\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('[VERIFY] Registration call succeeds (200)', () => pm.response.to.have.status(200));",
+                  "pm.test('[CRITICAL FINDING CHECK] Returned role should NOT be ADMIN for a public self-registration', () => {",
+                  "  pm.expect(json.data.role, 'If this fails, ANY anonymous user can self-provision an ADMIN account via POST /auth/register').to.not.eql('ADMIN');",
+                  "});",
+                  "if (json.data && json.data.token) {",
+                  "  pm.environment.set('selfAdminToken', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[Follow-up] Use self-registered token to call an Admin-only endpoint",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{selfAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "sales"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[CRITICAL FINDING CHECK] Admin-only report should be forbidden for a self-registered account', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, the self-registration privilege-escalation chain is fully confirmed exploitable').to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Auth - Login",
+      "item": [
+        {
+          "name": "Login - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"password\": \"customer123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Token returned', () => pm.expect(json.data.token).to.be.a('string'));",
+                  "pm.test('No password field in login response', () => pm.expect(json.data.password).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"placeholder\",\n  \"password\": \"placeholder\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const scenarios = [",
+                  "  { name: 'Wrong password', body: { email: 'customer@example.com', password: 'wrongpass123' }, expected: 401 },",
+                  "  { name: 'Non-existing email', body: { email: 'doesnotexist@example.com', password: 'anything' }, expected: 401 },",
+                  "  { name: 'Empty email', body: { email: '', password: 'customer123' }, expected: 400 },",
+                  "  { name: 'Empty password', body: { email: 'customer@example.com', password: '' }, expected: 400 },",
+                  "  { name: 'Missing email field', body: { password: 'customer123' }, expected: 400 },",
+                  "  { name: 'Missing password field', body: { email: 'customer@example.com' }, expected: 400 },",
+                  "  { name: 'Invalid email format', body: { email: 'not-an-email', password: 'x' }, expected: 400 },",
+                  "  { name: '[SECURITY] SQL injection in email', body: { email: \"' OR '1'='1\", password: 'x' }, expected: 400 },",
+                  "];",
+                  "",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/auth/login',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Login bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/profile - check password hash exposure",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('[CRITICAL FINDING CHECK] password field should NOT be present in profile response', () => {",
+                  "  pm.expect(json.data.password, 'If this fails, User.password lacks @JsonIgnore and the BCrypt hash is exposed via the API').to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout - without Authorization header",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Products",
+      "item": [
+        {
+          "name": "Get All Products - Happy Path (public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (public endpoint, no auth needed)', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns an array with the 10 seeded products', () => pm.expect(json.data.length).to.be.at.least(1));",
+                  "if (json.data && json.data.length > 0) { pm.environment.set('seedProductId', json.data[0].id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Product as Admin - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Test Product\",\n  \"description\": \"Created by automated QA\",\n  \"price\": 9.99,\n  \"category\": \"Test\",\n  \"brand\": \"QACorp\",\n  \"stockQuantity\": 100,\n  \"reorderLevel\": 10,\n  \"prescriptionRequired\": false\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('qaProductId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Product - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"placeholder\",\n  \"price\": 1\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const scenarios = [",
+                  "  { name: 'Missing name', body: { price: 5.0 }, expected: 400 },",
+                  "  { name: 'Empty name', body: { name: '', price: 5.0 }, expected: 400 },",
+                  "  { name: 'Negative price', body: { name: 'X', price: -5.0 }, expected: 400 },",
+                  "  { name: 'Zero price', body: { name: 'X', price: 0 }, expected: 400 },",
+                  "  { name: 'Missing price', body: { name: 'X' }, expected: 400 },",
+                  "  { name: 'Negative stockQuantity', body: { name: 'X', price: 5.0, stockQuantity: -10 }, expected: 400 },",
+                  "];",
+                  "const token = pm.environment.get('adminToken');",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/products',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Create product bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Create Product as Customer (expect 403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hack Product\",\n  \"price\": 1.0\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer must be forbidden from creating products', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Orders (incl. IDOR checks)",
+      "item": [
+        {
+          "name": "Create Order as Customer A - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{customerId}}\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": \"123 QA Lane\",\n  \"paymentMethod\": \"CASH\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('orderId', json.data.id);",
+                  "pm.test('Order belongs to Customer A', () => pm.expect(json.data.user.id).to.eql(parseInt(pm.environment.get('customerId'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Order - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{customerId}}\",\n  \"items\": [],\n  \"shippingAddress\": \"x\",\n  \"paymentMethod\": \"CASH\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('customerToken');",
+                  "const customerId = pm.environment.get('customerId');",
+                  "const scenarios = [",
+                  "  { name: 'Empty items array', body: { userId: customerId, items: [], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Missing shippingAddress', body: { userId: customerId, items: [{productId:1,quantity:1}], paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Missing paymentMethod', body: { userId: customerId, items: [{productId:1,quantity:1}], shippingAddress: 'x' }, expected: 400 },",
+                  "  { name: 'Quantity = 0', body: { userId: customerId, items: [{productId:1,quantity:0}], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Negative quantity', body: { userId: customerId, items: [{productId:1,quantity:-3}], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Insufficient stock (quantity=999999)', body: { userId: customerId, items: [{productId:1,quantity:999999}], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Non-existing productId', body: { userId: customerId, items: [{productId:999999,quantity:1}], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "  { name: 'Prescription-required product without prescriptionId', body: { userId: customerId, items: [{productId:2,quantity:1}], shippingAddress: 'x', paymentMethod: 'CASH' }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/orders',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Create order bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer A places an order using Customer B's userId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{customerBId}}\",\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": \"IDOR test\",\n  \"paymentMethod\": \"CASH\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Order should NOT be creatable under a different user\\'s ID', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, Customer A successfully created an order attributed to Customer B (IDOR)').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer A reads Customer B's order history by userId",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{customerBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{customerBId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer should not be able to view another user\\'s orders', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, any authenticated user can view any other user\\'s order history').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Customer A retrieves the full 'all orders' list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[RBAC FINDING CHECK] A plain Customer should not see every order in the system', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, GET /api/orders is not actually Admin/Pharmacist-restricted').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer A cancels an order they do not own",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not be able to cancel Customer A\\'s order', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, any authenticated user can cancel any order regardless of ownership').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Payments",
+      "item": [
+        {
+          "name": "Initiate Payment - Happy Path (only accepted test card)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/initiate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"userId\": \"{{customerId}}\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardHolderName\": \"Customer A\",\n  \"expiryMonth\": \"12\",\n  \"expiryYear\": \"2030\",\n  \"cvv\": \"123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('paymentId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Initiate Payment - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/initiate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "initiate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"userId\": \"{{customerId}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('customerToken');",
+                  "const orderId = pm.environment.get('orderId');",
+                  "const customerId = pm.environment.get('customerId');",
+                  "const scenarios = [",
+                  "  { name: 'Wrong card number', body: { orderId, userId: customerId, cardNumber: '5555555555554444', cardHolderName: 'X', expiryMonth: '12', expiryYear: '2030', cvv: '123' }, expected: 400 },",
+                  "  { name: 'CVV not 3 digits', body: { orderId, userId: customerId, cardNumber: '4111111111111111', cardHolderName: 'X', expiryMonth: '12', expiryYear: '2030', cvv: '12' }, expected: 400 },",
+                  "  { name: 'Non-numeric CVV', body: { orderId, userId: customerId, cardNumber: '4111111111111111', cardHolderName: 'X', expiryMonth: '12', expiryYear: '2030', cvv: 'abc' }, expected: 400 },",
+                  "  { name: 'Expired card', body: { orderId, userId: customerId, cardNumber: '4111111111111111', cardHolderName: 'X', expiryMonth: '01', expiryYear: '2020', cvv: '123' }, expected: 400 },",
+                  "  { name: 'Non-existing orderId', body: { orderId: 999999, userId: customerId, cardNumber: '4111111111111111', cardHolderName: 'X', expiryMonth: '12', expiryYear: '2030', cvv: '123' }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/payments/initiate',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Initiate payment bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Payment - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentId\": \"{{paymentId}}\",\n  \"transactionId\": \"TXN-QA-TEST\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Payment status becomes COMPLETED', () => pm.expect(json.data.status).to.eql('COMPLETED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer B reads Customer A's payment history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments/history?userId={{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{customerId}}"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not see Customer A\\'s payment history', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, payment history is not ownership-scoped').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Prescriptions",
+      "item": [
+        {
+          "name": "Upload Prescription - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/upload?userId={{customerId}}&fileName=prescription_qa.pdf&fileType=pdf&doctorName=Dr. QA",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "upload"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{customerId}}"
+                },
+                {
+                  "key": "fileName",
+                  "value": "prescription_qa.pdf"
+                },
+                {
+                  "key": "fileType",
+                  "value": "pdf"
+                },
+                {
+                  "key": "doctorName",
+                  "value": "Dr. QA"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('prescriptionId', json.data.id);",
+                  "pm.test('Status defaults to PENDING', () => pm.expect(json.data.status).to.eql('PENDING'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Customer approves their own prescription (expect 403)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/{{prescriptionId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "{{prescriptionId}}",
+                "approve"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer must be forbidden from approving prescriptions', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve Prescription as Pharmacist - Happy Path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/{{prescriptionId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "{{prescriptionId}}",
+                "approve"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status becomes APPROVED', () => pm.expect(json.data.status).to.eql('APPROVED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer B reads Customer A's prescriptions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/user/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "user",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not see Customer A\\'s prescriptions', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, prescription list is not ownership-scoped').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Users & Privilege Escalation (CRITICAL)",
+      "item": [
+        {
+          "name": "[CRITICAL SECURITY] Get all users as Customer (expect 403)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[RBAC FINDING CHECK] A plain Customer should not be able to list all users', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, GET /api/users has no role restriction').to.not.eql(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  const anyHasPassword = json.data.some(u => u.password !== undefined && u.password !== null);",
+                  "  pm.test('[CRITICAL FINDING CHECK] Returned users should not include a password field', () => {",
+                  "    pm.expect(anyHasPassword, 'If this fails, password hashes are exposed in the users list').to.eql(false);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[CRITICAL SECURITY] Customer self-escalates role to ADMIN",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ADMIN\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[CRITICAL FINDING CHECK] Customer should not be able to change their own role', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, a customer can grant themselves ADMIN privileges').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[Follow-up] Re-login as Customer B to check if the role change actually took effect",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{lastRegisteredEmail}}\",\n  \"password\": \"Secure123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// NOTE: run this only if the previous escalation request returned 200; otherwise this will",
+                  "// simply confirm the account is still CUSTOMER, which is the expected/safe outcome.",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('[CRITICAL FINDING CHECK] Role should still be CUSTOMER, not ADMIN', () => {",
+                  "    pm.expect(json.data.role).to.not.eql('ADMIN');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Users as Admin - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[CRITICAL SECURITY] Customer A escalates a DIFFERENT customer's (Customer B) role to ADMIN",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ADMIN\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[CRITICAL FINDING CHECK] Customer A should not be able to change Customer B\\'s role either', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, any customer can escalate ANY other account to ADMIN, not just their own').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[VALIDATION] Update role - empty request body",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Empty body should be rejected (not silently accepted as 200)', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[VALIDATION] Update role - invalid role string",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"WIZARD\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid enum value should be rejected', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[VALIDATION] Update role - lowercase 'admin' (case sensitivity check)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[VERIFY] UserRole.valueOf is case-sensitive - lowercase should be rejected, not silently normalized', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[VALIDATION] Update role - lowercase 'customer' (case sensitivity check)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"customer\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[VERIFY] Lowercase should be rejected, not silently normalized', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Role as Admin - Happy Path (legitimate, then revert)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}",
+                "role"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"PHARMACIST\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Role updated to PHARMACIST', () => pm.expect(json.data.role).to.eql('PHARMACIST'));",
+                  "// revert back to CUSTOMER so later requests in this collection are unaffected",
+                  "pm.sendRequest({",
+                  "  url: pm.environment.get('baseUrl') + '/users/' + pm.environment.get('customerBId') + '/role',",
+                  "  method: 'PUT',",
+                  "  header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.environment.get('adminToken') },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({ role: 'CUSTOMER' }) }",
+                  "}, (err, res) => {",
+                  "  pm.test('Role reverted back to CUSTOMER', () => pm.expect(res.code).to.eql(200));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register Throwaway User (to be deleted below)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"throwaway.{{$timestamp}}@example.com\",\n  \"password\": \"Secure123\",\n  \"fullName\": \"Throwaway User\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('throwawayUserId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete User as Admin - Happy Path",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{throwawayUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{throwawayUserId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete User - already-deleted / non-existing ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{throwawayUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{throwawayUserId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Second delete of the same (now-deleted) user -> 400 User not found', () => {",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[CRITICAL SECURITY/RBAC] Customer deletes another user (Customer B) via direct API call",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{customerBId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{customerBId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[CRITICAL FINDING CHECK] Customer should not be able to delete another account', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, any customer can delete ANY other account via API').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Notifications (IDOR)",
+      "item": [
+        {
+          "name": "[SECURITY/IDOR] Customer B reads Customer A's notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not see Customer A\\'s notifications', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, notifications are not ownership-scoped by the API').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Dashboard / Analytics / Reports (RBAC)",
+      "item": [
+        {
+          "name": "[SECURITY] Get full analytics as Customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/analytics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "analytics"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[RBAC FINDING CHECK] A Customer should not see store-wide analytics', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, GET /api/dashboard/analytics has no role restriction, unlike /api/reports/**').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Sales Report as Customer (expect 403 - correctly restricted)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "sales"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reports endpoints ARE correctly restricted to Admin/Pharmacist', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Sales Report as Admin - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "sales"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Users Report as Admin - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "users"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Get Users Report as Customer (expect 403 - correctly restricted)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "users"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reports endpoints ARE correctly restricted to Admin/Pharmacist', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Inventory Report as Admin - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "inventory"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Get Inventory Report as Customer (expect 403 - correctly restricted)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reports/inventory",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "inventory"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Reports endpoints ARE correctly restricted to Admin/Pharmacist', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Dashboard Stats as Customer - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Customer-scoped stats shape (myOrders present)', () => pm.expect(json.data).to.have.property('myOrders'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Dashboard Stats as Admin - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Admin-scoped stats shape (totalUsers present)', () => pm.expect(json.data).to.have.property('totalUsers'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Get Dashboard Stats without Authorization header",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. Auth - Update Profile",
+      "item": [
+        {
+          "name": "Update Profile - Happy Path (name/phone/address)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Customer A Updated\",\n  \"phone\": \"5559990000\",\n  \"address\": \"Updated Address 1\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('fullName updated', () => pm.expect(json.data.fullName).to.eql('Customer A Updated'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Profile - Change Password (correct current password, then revert)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"customer123\",\n  \"newPassword\": \"TempPass999\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "// Verify new password works",
+                  "pm.sendRequest({",
+                  "  url: pm.environment.get('baseUrl') + '/auth/login',",
+                  "  method: 'POST',",
+                  "  header: { 'Content-Type': 'application/json' },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@example.com', password: 'TempPass999' }) }",
+                  "}, (err, res) => {",
+                  "  pm.test('Re-login with NEW password succeeds', () => pm.expect(res.code).to.eql(200));",
+                  "  const newToken = res.json().data.token;",
+                  "  // Revert password back to original so other requests in this collection keep working",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/auth/update',",
+                  "    method: 'PUT',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + newToken },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ currentPassword: 'TempPass999', newPassword: 'customer123' }) }",
+                  "  }, (err2, res2) => {",
+                  "    pm.test('Password reverted back to original', () => pm.expect(res2.code).to.eql(200));",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Update Profile - Change Password with WRONG current password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"wrongOldPass\",\n  \"newPassword\": \"ShouldNotApply123\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (current password must be validated)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Update Profile without Authorization header",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "update"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Hacker\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11. Products - Single Product (GET/PUT/DELETE)",
+      "item": [
+        {
+          "name": "Get Product By ID - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "1"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (public)', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Returns a product object with an id', () => pm.expect(json.data.id).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product By ID - Non-existing ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "999999"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Product not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product By ID - Invalid/non-numeric ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "abc"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Spring cannot convert path var to Long)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Product as Admin - Happy Path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{qaProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{qaProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Test Product Updated\",\n  \"price\": 14.99,\n  \"stockQuantity\": 150\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Price updated', () => pm.expect(json.data.price).to.eql(14.99));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Product - ALL Bad Scenarios",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{qaProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{qaProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"placeholder\",\n  \"price\": 1\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('adminToken');",
+                  "const qaProductId = pm.environment.get('qaProductId');",
+                  "const scenarios = [",
+                  "  { name: 'Update non-existing product ID', url: '/products/999999', body: { name: 'X', price: 5.0 }, expected: 400 },",
+                  "  { name: 'Update with invalid (non-numeric) product ID', url: '/products/abc', body: { name: 'X', price: 5.0 }, expected: 400 },",
+                  "  { name: 'Update with negative price', url: '/products/' + qaProductId, body: { name: 'X', price: -5.0 }, expected: 400 },",
+                  "  { name: 'Update with empty name', url: '/products/' + qaProductId, body: { name: '', price: 5.0 }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + s.url,",
+                  "    method: 'PUT',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Update product bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Update Product as Customer (expect 403)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{qaProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{qaProductId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hacked\",\n  \"price\": 1.0\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer must be forbidden from updating products', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Product as Admin - Happy Path (deletes the QA test product)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{qaProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{qaProductId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Product - Already-deleted / non-existing ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{qaProductId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{qaProductId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Second delete of the same (now-deleted) product -> 400 Product not found', () => {",
+                  "  pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Delete Product as Customer (expect 403)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "1"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer must be forbidden from deleting products', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12. Products - Search & Inventory",
+      "item": [
+        {
+          "name": "Search Products - Happy Path (by name)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/search?query=Para",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "Para"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (public)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Products - empty query returns full list",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/search?query=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200, treated as no filter', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Products - filter=prescription_required",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/search?filter=prescription_required",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "prescription_required"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('All returned products require a prescription', () => {",
+                  "  const allTrue = json.data.every(p => p.prescriptionRequired === true);",
+                  "  pm.expect(allTrue).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Search Products - SQL injection payload in query",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/search?query=' OR '1'='1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "' OR '1'='1"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('No server error / injection, status 200 with safe (likely empty) result', () => {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Stock Levels - Happy Path (authenticated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/stock-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "stock-levels"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Get Stock Levels without Authorization header",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/stock-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "stock-levels"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Stock - ADD operation, Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/update-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "update-stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"quantity\": 5,\n  \"operation\": \"ADD\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Stock - SUBTRACT operation, Happy Path (then restore)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/update-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "update-stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"quantity\": 5,\n  \"operation\": \"SUBTRACT\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (restores the +5 added just before)', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Stock - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inventory/update-stock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inventory",
+                "update-stock"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"quantity\": 1,\n  \"operation\": \"ADD\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('adminToken');",
+                  "const scenarios = [",
+                  "  { name: 'Invalid operation string', body: { productId: 1, quantity: 5, operation: 'MULTIPLY' }, expected: 400 },",
+                  "  { name: 'SUBTRACT more than available stock', body: { productId: 1, quantity: 999999, operation: 'SUBTRACT' }, expected: 400 },",
+                  "  { name: 'Missing quantity', body: { productId: 1, operation: 'ADD' }, expected: 400 },",
+                  "  { name: 'Missing productId', body: { quantity: 5, operation: 'ADD' }, expected: 400 },",
+                  "  { name: 'Non-existing productId', body: { productId: 999999, quantity: 5, operation: 'ADD' }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/inventory/update-stock',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Update stock bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13. Prescriptions - Extended (all/pending/path-variant/reject)",
+      "item": [
+        {
+          "name": "Get All Prescriptions (staff view)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Pending Prescriptions (staff queue)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "pending"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('All returned items are PENDING', () => {",
+                  "  const allPending = json.data.every(p => p.status === 'PENDING');",
+                  "  pm.expect(allPending).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get User Prescriptions - path-variable variant /{userId}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload a second prescription (to reject)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/upload?userId={{customerId}}&fileName=to_reject.pdf&fileType=pdf&doctorName=Dr. Reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "upload"
+              ],
+              "query": [
+                {
+                  "key": "userId",
+                  "value": "{{customerId}}"
+                },
+                {
+                  "key": "fileName",
+                  "value": "to_reject.pdf"
+                },
+                {
+                  "key": "fileType",
+                  "value": "pdf"
+                },
+                {
+                  "key": "doctorName",
+                  "value": "Dr. Reject"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('prescriptionToRejectId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject Prescription as Pharmacist - Happy Path (with reason)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/{{prescriptionToRejectId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "{{prescriptionToRejectId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Illegible handwriting, please resubmit\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status becomes REJECTED', () => pm.expect(json.data.status).to.eql('REJECTED'));",
+                  "pm.test('rejectionReason stored', () => pm.expect(json.data.rejectionReason).to.eql('Illegible handwriting, please resubmit'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/RBAC] Customer rejects a prescription via direct API call",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/{{prescriptionId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "{{prescriptionId}}",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"test\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Customer must be forbidden from rejecting prescriptions', () => {",
+                  "  pm.expect(pm.response.code).to.eql(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a non-existing prescription ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prescriptions/999999/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prescriptions",
+                "999999",
+                "reject"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"test\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Prescription not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "14. Reviews",
+      "item": [
+        {
+          "name": "Get Product Reviews - Happy Path (public)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews",
+                "1"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 (public endpoint)', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Response has reviews/averageRating/totalReviews shape', () => {",
+                  "  pm.expect(json.data).to.have.property('averageRating');",
+                  "  pm.expect(json.data).to.have.property('totalReviews');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Review - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"rating\": 5,\n  \"comment\": \"Great product, fast relief\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Review - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"rating\": 5\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('customerToken');",
+                  "const scenarios = [",
+                  "  { name: 'Rating = 0 (below minimum)', body: { productId: 1, rating: 0 }, expected: 400 },",
+                  "  { name: 'Rating = 6 (above maximum)', body: { productId: 1, rating: 6 }, expected: 400 },",
+                  "  { name: 'Missing rating', body: { productId: 1 }, expected: 400 },",
+                  "  { name: 'Missing productId', body: { rating: 4 }, expected: 400 },",
+                  "  { name: 'Non-existing productId', body: { productId: 999999, rating: 4 }, expected: 400 },",
+                  "  { name: 'Negative rating', body: { productId: 1, rating: -2 }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/reviews',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Submit review bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Submit Review without Authorization header",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviews"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": 1,\n  \"rating\": 4\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "15. Chat",
+      "item": [
+        {
+          "name": "Get Pharmacist for Chat (Customer) - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/pharmacist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "pharmacist"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('chatStaffId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Conversations (Staff view)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversations"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send Chat Message - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "send"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": \"{{chatStaffId}}\",\n  \"message\": \"Hello, I have a question about my order\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('chatMessageId', json.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send Chat Message - non-existing receiverId",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "send"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": 999999,\n  \"message\": \"hi\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Receiver not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Conversation with Staff - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/conversation/{{chatStaffId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "conversation",
+                "{{chatStaffId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Conversation contains the message just sent', () => {",
+                  "  pm.expect(json.data.length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Chat Message as Read - Happy Path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/read/{{chatMessageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "read",
+                "{{chatMessageId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Chat Message as Read - non-existing message ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{pharmacistToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/read/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "read",
+                "999999"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Message not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY] Send Chat Message without Authorization header",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "send"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": \"{{chatStaffId}}\",\n  \"message\": \"hi\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Must require authentication', () => {",
+                  "  pm.expect(pm.response.code).to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16. Support Tickets",
+      "item": [
+        {
+          "name": "Create Support Ticket - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Cannot track my order\",\n  \"description\": \"Order has not updated in 3 days\",\n  \"priority\": \"HIGH\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('ticketId', json.data.id);",
+                  "pm.test('Status defaults to OPEN', () => pm.expect(json.data.status).to.eql('OPEN'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Support Ticket - ALL Bad Scenarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"placeholder\",\n  \"description\": \"placeholder\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.environment.get('customerToken');",
+                  "const scenarios = [",
+                  "  { name: 'Empty subject', body: { subject: '', description: 'y' }, expected: 400 },",
+                  "  { name: 'Empty description', body: { subject: 'x', description: '' }, expected: 400 },",
+                  "  { name: 'Missing subject', body: { description: 'y' }, expected: 400 },",
+                  "  { name: 'Missing description', body: { subject: 'x' }, expected: 400 },",
+                  "];",
+                  "scenarios.forEach((s) => {",
+                  "  pm.sendRequest({",
+                  "    url: pm.environment.get('baseUrl') + '/support/ticket',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },",
+                  "    body: { mode: 'raw', raw: JSON.stringify(s.body) }",
+                  "  }, (err, res) => {",
+                  "    pm.test(`Create ticket bad scenario: ${s.name} -> expect ${s.expected}`, () => {",
+                  "      pm.expect(res.code).to.eql(s.expected);",
+                  "    });",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get My Tickets (Customer, own only) - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Tickets (Admin view)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/tickets/all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "tickets",
+                "all"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Ticket Details - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/{{ticketId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "{{ticketId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Ticket Details - non-existing ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "999999"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Ticket not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Response to Ticket (Admin) - Happy Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/{{ticketId}}/response",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "{{ticketId}}",
+                "response"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"We are looking into this and will update you shortly.\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status auto-resolves to RESOLVED', () => pm.expect(json.data.status).to.eql('RESOLVED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Ticket Status - Happy Path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/{{ticketId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "{{ticketId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Ticket Status - invalid status value",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/{{ticketId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "{{ticketId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"WEIRD_STATUS\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (invalid status)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer B reads Customer A's ticket by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support/ticket/{{ticketId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support",
+                "ticket",
+                "{{ticketId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not see Customer A\\'s ticket', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, tickets are not ownership-scoped by ID').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "17. Notifications - Unread",
+      "item": [
+        {
+          "name": "Get Unread Notifications - Happy Path",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{customerId}}/unread",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{customerId}}",
+                "unread"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('All returned notifications are unread', () => {",
+                  "  const allUnread = json.data.every(n => n.read === false);",
+                  "  pm.expect(allUnread).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a notification ID (prerequisite for the two requests below)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{customerId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.length > 0) {",
+                  "  pm.environment.set('notificationId', json.data[0].id);",
+                  "}",
+                  "pm.test('At least one notification exists to test against (run Orders/Payments/Prescriptions folders first if this fails)', () => {",
+                  "  pm.expect(json.data.length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification as Read - Happy Path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('read becomes true', () => pm.expect(json.data.read).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification as Read - non-existing ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/999999/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "999999",
+                "read"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400 (Notification not found)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[SECURITY/IDOR] Customer B marks Customer A's notification as read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerBToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificationId}}",
+                "read"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('[IDOR FINDING CHECK] Customer B should not be able to mark Customer A\\'s notification as read', () => {",
+                  "  pm.expect(pm.response.code, 'If this is 200, any user can tamper with any other user\\'s notification state').to.not.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
