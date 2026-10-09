@@ -9,3 +9,4 @@ Manual Test Design — Derived 396 manual test cases directly from source-code a
 API Test Automation — Built a 112-request Postman collection (plus environment) covering every documented endpoint, with automated pm.test assertions for happy/negative paths and dedicated checks for IDOR and privilege-escalation vulnerabilities uncovered during the review.
 
 Tech/tools used: Spring Boot (Java) & React source analysis, Postman (Collections, Environments, test scripting), Excel-based test management (RTM-style gap log, test case matrix).
+<img width="1535" height="726" alt="image" src="https://github.com/user-attachments/assets/d7737aab-cba1-4595-81d9-ab064a55be20" />
